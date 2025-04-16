@@ -1,4 +1,4 @@
-TCR Utility Update 🚀
+TCR Utility Update 🚀 send-rewards-XLSX.js (send-rewards is old version for 1 wallet at a time)
 
 Hello team! We’ve just updated the utility – now you can send rewards using an Excel file! 🎉
 
