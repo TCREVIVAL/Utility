@@ -1,0 +1,29 @@
+Learning React
+
+to create a react folder we need to give command in Terminal to create the app
+
+npx create-react-app my-app will create my app of type react
+
+to install terra.js
+npm install @terra-money/terra.js
+
+to interact with excel file use
+npm install xlsx
+
+add polly file
+npm install buffer process stream-browserify util
+
+this will not fix and we need 
+npm install react-app-rewired --save-dev
+
+then do this to create config-override.js
+New-Item config-overrides.js -ItemType File
+
+install this for terra.js
+npm install buffer process stream-browserify
+
+npm start
+
+npm install stream-browserify
+
+npm install crypto-browserify buffer util process assert
