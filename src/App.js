@@ -4,6 +4,7 @@ import { LCDClient, MnemonicKey, MsgExecuteContract, MsgSend, isTxError } from "
 
 export default function App() {
   const [mnemonic, setMnemonic] = useState("");
+  const [showMnemonic, setShowMnemonic] = useState(false);
   const [tokenContract, setTokenContract] = useState("");
   const [isToken, setIsToken] = useState(true);
   const [recipients, setRecipients] = useState([{ address: "", amount: "" }]);
@@ -11,6 +12,12 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [tokenInfo, setTokenInfo] = useState(null);
+
+  useEffect(() => {
+    if (console && (console.log.toString().includes("mnemonic") || console.debug?.toString().includes("mnemonic"))) {
+      alert("⚠️ Warning: Mnemonic should never be logged to console.");
+    }
+  }, []);
 
   const handleRecipientChange = (index, field, value) => {
     const updated = [...recipients];
@@ -109,17 +116,30 @@ export default function App() {
           return;
         }
 
-        const formattedRecipients = rows.slice(1).map((row) => ({
-          address: row[0],
-          amount: row[1],
-        }));
+        const formattedRecipients = [];
+        const invalidRows = [];
 
-        const isValid = formattedRecipients.every(
-          (r) => r.address && !isNaN(r.amount) && parseFloat(r.amount) > 0
-        );
+        rows.slice(1).forEach((row, i) => {
+          if (!row || row.length < 2 || (!row[0] && !row[1])) return; // skip empty
 
-        if (!isValid) {
-          setError("❌ Invalid data in Excel file.");
+          const address = row[0] ? String(row[0]).trim() : "";
+          const amount = row[1] !== undefined ? parseFloat(row[1]) : NaN;
+
+          if (
+            address &&
+            /^terra1[0-9a-z]{38}$/.test(address) &&
+            !isNaN(amount) &&
+            amount > 0
+          ) {
+            formattedRecipients.push({ address, amount: amount.toString() });
+          } else {
+            invalidRows.push({ row: i + 2, address, amount });
+          }
+        });
+
+        if (invalidRows.length > 0) {
+          const errors = invalidRows.map((r) => `Row ${r.row}: Address="${r.address}", Amount="${r.amount}"`);
+          setError("❌ Invalid data in Excel file:\n" + errors.join("\n"));
           return;
         }
 
@@ -168,57 +188,76 @@ export default function App() {
   };
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-4 text-white">
+    <div className="max-w-xl mx-auto p-1 space-y-1 text-white">
       <h1 className="text-2xl font-bold text-center">TCR - A USTC BURNING TOKEN</h1>
       <h5 className="text-2xl font-bold text-center">Welcome to Batch Sender</h5>
       <h5 className="text-2xl font-bold text-center">Please understand and test the utility before using, Use the utility at your own risk, We will not be liable for any losses you may have to occur.</h5>
 
-      <label className="block text-sm">Your 24-word Mnemonic:</label>
-      <input
-        className="w-full p-2 rounded bg-gray-700 border border-gray-600"
-        type="text"
-        value={mnemonic}
-        onChange={(e) => setMnemonic(e.target.value)}
-      />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm">Your 24-word Mnemonic:</label>
+          <div className="relative">
+            <input
+              className="w-full p-2 rounded bg-gray-700 border border-gray-600 pr-10 select-none"
+              type={showMnemonic ? "text" : "password"}
+              value={mnemonic}
+              onChange={(e) => setMnemonic(e.target.value)}
+              onCopy={(e) => {
+                e.preventDefault();
+                alert("❌ Copying mnemonic is disabled for your safety.");
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowMnemonic(!showMnemonic)}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-sm text-blue-300"
+            >
+              {showMnemonic ? "Hide" : "Show"}
+            </button>
+          </div>
+        </div>
 
-      <div className="flex items-center space-x-4">
-        <label className="text-sm">Send:</label>
-        <select
-          value={isToken ? "token" : "lunc"}
-          onChange={(e) => setIsToken(e.target.value === "token")}
-          className="bg-gray-700 border border-gray-600 p-2 rounded"
-        >
-          <option value="token">CW20 Token</option>
-          <option value="lunc">Native LUNC</option>
-        </select>
+        <div className="flex items-center space-x-4">
+          <label className="text-sm">Send:</label>
+          <select
+            value={isToken ? "token" : "lunc"}
+            onChange={(e) => setIsToken(e.target.value === "token")}
+            className="bg-gray-700 border border-gray-600 p-2 rounded"
+          >
+            <option value="token">CW20 Token</option>
+            <option value="lunc">Native LUNC</option>
+          </select>
+        </div>
       </div>
 
       {isToken && (
-        <>
-          <label className="block text-sm">Token Contract Address:</label>
-          <input
-            className="w-full p-2 rounded bg-gray-700 border border-gray-600"
-            type="text"
-            value={tokenContract}
-            onChange={(e) => setTokenContract(e.target.value)}
-          />
-          {tokenInfo && (
-            <div className="text-green-400 text-sm mt-1">
-              Detected Token: {tokenInfo.name} ({tokenInfo.symbol})
-            </div>
-          )}
-        </>
-      )}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm">Token Contract Address:</label>
+            <input
+              className="w-full p-2 rounded bg-gray-700 border border-gray-600"
+              type="text"
+              value={tokenContract}
+              onChange={(e) => setTokenContract(e.target.value)}
+            />
+            {tokenInfo && (
+              <div className="text-green-400 text-sm mt-1">
+                Detected Token: {tokenInfo.name} ({tokenInfo.symbol})
+              </div>
+            )}
+          </div>
 
-      <div className="space-y-2">
-        <label className="text-sm block">Upload Excel File:</label>
-        <input
-          type="file"
-          accept=".xlsx"
-          onChange={handleFileUpload}
-          className="w-full p-2 rounded bg-gray-700 border border-gray-600"
-        />
-      </div>
+          <div>
+            <label className="text-sm block">Upload Excel File:</label>
+            <input
+              type="file"
+              accept=".xlsx"
+              onChange={handleFileUpload}
+              className="w-full p-2 rounded bg-gray-700 border border-gray-600"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <label className="text-sm block">Recipients:</label>
@@ -273,21 +312,21 @@ export default function App() {
         </div>
       )}
 
-      {error && <div className="text-red-400 mt-4">{error}</div>}
+      {error && <div className="text-red-400 mt-4 whitespace-pre-wrap">{error}</div>}
 
       <p className="text-sm text-gray-400 mt-6">
-  🔒 This app runs in your browser and does not store your mnemonic, address, or amount anywhere.<br /><br />
-
-  <b>Instructions to use the Utility </b> <br /><br />
-  Step 1: Enter Menmonic <br />
-  Step 2: Enter TokenAddress<br />
-  Step 3: If using excel file make sure the structure of excel file is " Address  Amount " and then populate the rows with respective token and amounts you wish to send.<br /><br />
-
-  <b>FUN FACTS</b><br />
-  <b>Help and support</b>Help and support our project and keep them <b>open source</b>. 
-  Trade TCR tokens to accelerate USTC Burns + Genrate Long Term Wealth <br />
-  This is not financial Advice.
-</p>
+        🔒 This app runs in your browser and does not store your mnemonic, address, or amount anywhere.<br /><br />
+        <b>We have now Incorporated new Security Features on this app.</b> <br />
+        <i>🛠️ Mask Mnemonic Input Field, 🛠️ Add a “Show/Hide Mnemonic” Toggle,  🛠️ Clear Mnemonic from Memory After Tx Automatically, 🛠️ Warn if Mnemonic is Stored in Console or Code , 🛠️ Prevent Copying Mnemonic from Input Field</i> <br />
+        <b>Instructions to use the Utility </b> <br />
+        Step 1: Enter Mnemonic <br />
+        Step 2: Enter Token Address<br />
+        Step 3: If using Excel file make sure the structure of Excel file is " Address  Amount " and then populate the rows with respective token and amounts you wish to send.<br /><br />
+        <b>Help and support Our Project </b><br />
+        <a href='https://garuda-defi.org/market/terra1j8hxr6v6g5ku65apq47lta00kgwq7e6kf52vv5twmljz9zvg095qmq4hks'>🛒 Buy TCR</a><br />
+        Trade TCR tokens to accelerate USTC Burns + Generate Long Term Wealth <br />
+        This is not financial Advice.
+      </p>
     </div>
   );
 }
